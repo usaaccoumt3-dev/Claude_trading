@@ -2,9 +2,12 @@ import requests
 import time
 
 NTFY_URL = "https://ntfy.sh/raokaif_trading"
-WATCHLIST = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "ADAUSDT"]
-TIMEFRAME = "1h"
-LIMIT = 50
+WATCHLIST = {
+    "bitcoin": "BTC",
+    "ethereum": "ETH",
+    "solana": "SOL",
+    "cardano": "ADA"
+}
 
 def send_alert(title, message, priority="high"):
     try:
@@ -18,30 +21,30 @@ def send_alert(title, message, priority="high"):
     except Exception as e:
         print(f"⚠️ Alert error: {e}")
 
-def get_candles(symbol):
-    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={TIMEFRAME}&limit={LIMIT}"
+def get_candles(coin_id):
+    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/ohlc?vs_currency=usd&days=7"
     try:
         r = requests.get(url, timeout=15)
         data = r.json()
-        # Fix: check if response is a list (valid) not dict (error)
         if not isinstance(data, list):
-            print(f"⚠️ Binance error for {symbol}: {data}")
+            print(f"⚠️ CoinGecko error for {coin_id}: {data}")
             return None
         candles = []
         for c in data:
             try:
                 candles.append({
+                    "time":  c[0],
                     "open":  float(c[1]),
                     "high":  float(c[2]),
                     "low":   float(c[3]),
                     "close": float(c[4]),
-                    "vol":   float(c[5])
+                    "vol":   0.0
                 })
             except (ValueError, IndexError):
                 continue
         return candles if len(candles) >= 30 else None
     except Exception as e:
-        print(f"⚠️ Candle fetch error {symbol}: {e}")
+        print(f"⚠️ Candle fetch error {coin_id}: {e}")
         return None
 
 def ema(closes, period):
@@ -70,7 +73,7 @@ def bollinger(closes, period=20):
     std = (sum((x - mean) ** 2 for x in recent) / period) ** 0.5
     return mean - 2 * std, mean, mean + 2 * std
 
-def analyze(symbol, candles):
+def analyze(coin_id, symbol, candles):
     closes = [c["close"] for c in candles]
 
     curr    = candles[-2]
@@ -85,7 +88,7 @@ def analyze(symbol, candles):
 
     ema9     = ema(closes[-20:], 9)
     ema21    = ema(closes[-30:], 21)
-    ema50    = ema(closes[-50:], 50)
+    ema50    = ema(closes, 50)
     rsi_val  = rsi(closes[-15:])
     bb_lower, bb_mid, _ = bollinger(closes)
 
@@ -100,7 +103,7 @@ def analyze(symbol, candles):
 
     if c_low < low_15 and c_close > low_15 and c_close > ema50:
         signal  = "SMC Liquidity Sweep ⚡"
-        detail  = f"Swept {low_15:.4f}, rejected up. EMA50 ok."
+        detail  = f"Swept {low_15:.4f}, rejected up."
         target1 = round(c_close * 1.02, 4)
         target2 = round(c_close * 1.04, 4)
         invalid = round(c_close * 0.97, 4)
@@ -110,7 +113,7 @@ def analyze(symbol, candles):
         fib618 = high_15 - 0.618 * (high_15 - low_15)
         if c_low <= fib50 and c_close >= fib618 and c_close > ema50:
             signal  = "Golden Sniper Fib 🎯"
-            detail  = f"Fib zone {fib618:.4f}-{fib50:.4f}. EMA50 ok."
+            detail  = f"Fib {fib618:.4f}-{fib50:.4f} hit."
             target1 = round(c_close * 1.025, 4)
             target2 = round(c_close * 1.05, 4)
             invalid = round(c_close * 0.97, 4)
@@ -126,7 +129,7 @@ def analyze(symbol, candles):
     if signal is None:
         if c_close <= bb_lower and candles[-2]["close"] > candles[-3]["close"]:
             signal  = "BB Mean Reversion 📊"
-            detail  = f"Lower BB {bb_lower:.4f} hit, target mid {bb_mid:.4f}"
+            detail  = f"Lower BB {bb_lower:.4f}, target {bb_mid:.4f}"
             target1 = round(bb_mid, 4)
             target2 = round(bb_mid * 1.01, 4)
             invalid = round(c_close * 0.975, 4)
@@ -149,10 +152,10 @@ def analyze(symbol, candles):
 
 def main():
     print(f"🚀 Scan started: {time.strftime('%Y-%m-%d %H:%M:%S UTC')}")
-    for symbol in WATCHLIST:
-        candles = get_candles(symbol)
+    for coin_id, symbol in WATCHLIST.items():
+        candles = get_candles(coin_id)
         if candles:
-            analyze(symbol, candles)
+            analyze(coin_id, symbol, candles)
         else:
             print(f"⚠️ Skipping {symbol} — data issue.")
     print("✅ Scan complete.")
