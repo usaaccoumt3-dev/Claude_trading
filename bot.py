@@ -21,18 +21,25 @@ def send_alert(title, message, priority="high"):
 def get_candles(symbol):
     url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={TIMEFRAME}&limit={LIMIT}"
     try:
-        r = requests.get(url, timeout=10)
+        r = requests.get(url, timeout=15)
         data = r.json()
+        # Fix: check if response is a list (valid) not dict (error)
+        if not isinstance(data, list):
+            print(f"⚠️ Binance error for {symbol}: {data}")
+            return None
         candles = []
         for c in data:
-            candles.append({
-                "open":  float(c[1]),
-                "high":  float(c[2]),
-                "low":   float(c[3]),
-                "close": float(c[4]),
-                "vol":   float(c[5])
-            })
-        return candles
+            try:
+                candles.append({
+                    "open":  float(c[1]),
+                    "high":  float(c[2]),
+                    "low":   float(c[3]),
+                    "close": float(c[4]),
+                    "vol":   float(c[5])
+                })
+            except (ValueError, IndexError):
+                continue
+        return candles if len(candles) >= 30 else None
     except Exception as e:
         print(f"⚠️ Candle fetch error {symbol}: {e}")
         return None
@@ -66,53 +73,48 @@ def bollinger(closes, period=20):
 def analyze(symbol, candles):
     closes = [c["close"] for c in candles]
 
-    # ✅ [-2] = guaranteed last CLOSED candle
-    curr        = candles[-2]
-    c_close     = curr["close"]
-    c_low       = curr["low"]
-    c_high      = curr["high"]
+    curr    = candles[-2]
+    c_close = curr["close"]
+    c_low   = curr["low"]
 
-    past        = candles[-17:-2]
-    past_highs  = [c["high"] for c in past]
-    past_lows   = [c["low"]  for c in past]
-    past_vols   = [c["vol"]  for c in past]
-    high_15     = max(past_highs)
-    low_15      = min(past_lows)
+    past       = candles[-17:-2]
+    past_highs = [c["high"] for c in past]
+    past_lows  = [c["low"]  for c in past]
+    high_15    = max(past_highs)
+    low_15     = min(past_lows)
 
-    ema9        = ema(closes[-20:], 9)
-    ema21       = ema(closes[-30:], 21)
-    ema50       = ema(closes[-60:], 50)
-    rsi_val     = rsi(closes[-15:])
-    bb_lower, bb_mid, bb_upper = bollinger(closes)
+    ema9     = ema(closes[-20:], 9)
+    ema21    = ema(closes[-30:], 21)
+    ema50    = ema(closes[-50:], 50)
+    rsi_val  = rsi(closes[-15:])
+    bb_lower, bb_mid, _ = bollinger(closes)
 
-    prev_ema9   = ema(closes[-21:-1], 9)
-    prev_ema21  = ema(closes[-31:-1], 21)
+    prev_ema9  = ema(closes[-21:-1], 9)
+    prev_ema21 = ema(closes[-31:-1], 21)
 
-    signal      = None
-    target1     = None
-    target2     = None
-    invalid     = None
+    signal  = None
+    target1 = None
+    target2 = None
+    invalid = None
+    detail  = ""
 
-    # Strategy 1: SMC Liquidity Sweep + EMA50 filter
     if c_low < low_15 and c_close > low_15 and c_close > ema50:
         signal  = "SMC Liquidity Sweep ⚡"
-        detail  = f"Swept {low_15:.4f} low, rejected up. EMA50 confirmed."
+        detail  = f"Swept {low_15:.4f}, rejected up. EMA50 ok."
         target1 = round(c_close * 1.02, 4)
         target2 = round(c_close * 1.04, 4)
         invalid = round(c_close * 0.97, 4)
 
-    # Strategy 2: Golden Sniper Fib 50-61.8% + EMA50 filter
     elif (high_15 - low_15) > 0:
         fib50  = high_15 - 0.50  * (high_15 - low_15)
         fib618 = high_15 - 0.618 * (high_15 - low_15)
         if c_low <= fib50 and c_close >= fib618 and c_close > ema50:
             signal  = "Golden Sniper Fib 🎯"
-            detail  = f"Fib zone {fib618:.4f}-{fib50:.4f} hit. EMA50 above."
+            detail  = f"Fib zone {fib618:.4f}-{fib50:.4f}. EMA50 ok."
             target1 = round(c_close * 1.025, 4)
             target2 = round(c_close * 1.05, 4)
             invalid = round(c_close * 0.97, 4)
 
-    # Strategy 3: EMA 9/21 Crossover + RSI confirm
     if signal is None:
         if prev_ema9 < prev_ema21 and ema9 > ema21 and rsi_val > 50:
             signal  = "EMA 9/21 Crossover 📈"
@@ -121,11 +123,10 @@ def analyze(symbol, candles):
             target2 = round(c_close * 1.035, 4)
             invalid = round(c_close * 0.975, 4)
 
-    # Strategy 4: Bollinger Band Mean Reversion (Ranging Market)
     if signal is None:
         if c_close <= bb_lower and candles[-2]["close"] > candles[-3]["close"]:
             signal  = "BB Mean Reversion 📊"
-            detail  = f"Lower BB ({bb_lower:.4f}) hit, bouncing to mid ({bb_mid:.4f})"
+            detail  = f"Lower BB {bb_lower:.4f} hit, target mid {bb_mid:.4f}"
             target1 = round(bb_mid, 4)
             target2 = round(bb_mid * 1.01, 4)
             invalid = round(c_close * 0.975, 4)
@@ -135,9 +136,9 @@ def analyze(symbol, candles):
         msg = (
             f"Strategy: {signal}\n"
             f"Entry: {c_close:.4f}\n"
-            f"Target 1: {target1} (+2%)\n"
-            f"Target 2: {target2} (+4%)\n"
-            f"Invalidation: {invalid} (-3%)\n"
+            f"Target 1: {target1}\n"
+            f"Target 2: {target2}\n"
+            f"Invalidation: {invalid}\n"
             f"Detail: {detail}\n"
             f"Time: {time.strftime('%H:%M UTC')}"
         )
@@ -150,10 +151,10 @@ def main():
     print(f"🚀 Scan started: {time.strftime('%Y-%m-%d %H:%M:%S UTC')}")
     for symbol in WATCHLIST:
         candles = get_candles(symbol)
-        if candles and len(candles) >= 30:
+        if candles:
             analyze(symbol, candles)
         else:
-            print(f"⚠️ Not enough data: {symbol}")
+            print(f"⚠️ Skipping {symbol} — data issue.")
     print("✅ Scan complete.")
 
 main()
