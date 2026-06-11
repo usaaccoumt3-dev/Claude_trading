@@ -65,16 +65,14 @@ def bollinger(closes, period=20):
 
 def analyze(symbol, candles):
     closes = [c["close"] for c in candles]
-    highs  = [c["high"]  for c in candles]
-    lows   = [c["low"]   for c in candles]
-    vols   = [c["vol"]   for c in candles]
 
-    curr        = candles[-1]
+    # ✅ [-2] = guaranteed last CLOSED candle
+    curr        = candles[-2]
     c_close     = curr["close"]
     c_low       = curr["low"]
     c_high      = curr["high"]
 
-    past        = candles[-16:-1]
+    past        = candles[-17:-2]
     past_highs  = [c["high"] for c in past]
     past_lows   = [c["low"]  for c in past]
     past_vols   = [c["vol"]  for c in past]
@@ -97,11 +95,11 @@ def analyze(symbol, candles):
 
     # Strategy 1: SMC Liquidity Sweep + EMA50 filter
     if c_low < low_15 and c_close > low_15 and c_close > ema50:
-        signal   = "SMC Liquidity Sweep ⚡"
-        detail   = f"Swept {low_15:.4f} low, rejected up. EMA50 trend confirmed."
-        target1  = round(c_close * 1.02, 4)
-        target2  = round(c_close * 1.04, 4)
-        invalid  = round(c_close * 0.97, 4)
+        signal  = "SMC Liquidity Sweep ⚡"
+        detail  = f"Swept {low_15:.4f} low, rejected up. EMA50 confirmed."
+        target1 = round(c_close * 1.02, 4)
+        target2 = round(c_close * 1.04, 4)
+        invalid = round(c_close * 0.97, 4)
 
     # Strategy 2: Golden Sniper Fib 50-61.8% + EMA50 filter
     elif (high_15 - low_15) > 0:
@@ -109,7 +107,7 @@ def analyze(symbol, candles):
         fib618 = high_15 - 0.618 * (high_15 - low_15)
         if c_low <= fib50 and c_close >= fib618 and c_close > ema50:
             signal  = "Golden Sniper Fib 🎯"
-            detail  = f"Fib 50-61.8% zone hit ({fib618:.4f}-{fib50:.4f}). EMA50 above."
+            detail  = f"Fib zone {fib618:.4f}-{fib50:.4f} hit. EMA50 above."
             target1 = round(c_close * 1.025, 4)
             target2 = round(c_close * 1.05, 4)
             invalid = round(c_close * 0.97, 4)
@@ -118,16 +116,16 @@ def analyze(symbol, candles):
     if signal is None:
         if prev_ema9 < prev_ema21 and ema9 > ema21 and rsi_val > 50:
             signal  = "EMA 9/21 Crossover 📈"
-            detail  = f"EMA9 crossed above EMA21. RSI={rsi_val:.1f}"
+            detail  = f"EMA9 crossed EMA21. RSI={rsi_val:.1f}"
             target1 = round(c_close * 1.02, 4)
             target2 = round(c_close * 1.035, 4)
             invalid = round(c_close * 0.975, 4)
 
     # Strategy 4: Bollinger Band Mean Reversion (Ranging Market)
     if signal is None:
-        if c_close <= bb_lower and candles[-1]["close"] > candles[-2]["close"]:
+        if c_close <= bb_lower and candles[-2]["close"] > candles[-3]["close"]:
             signal  = "BB Mean Reversion 📊"
-            detail  = f"Price hit lower BB ({bb_lower:.4f}), bouncing to mid ({bb_mid:.4f})"
+            detail  = f"Lower BB ({bb_lower:.4f}) hit, bouncing to mid ({bb_mid:.4f})"
             target1 = round(bb_mid, 4)
             target2 = round(bb_mid * 1.01, 4)
             invalid = round(c_close * 0.975, 4)
