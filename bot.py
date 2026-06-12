@@ -1,163 +1,181 @@
 import requests
 import time
+import json
 
 NTFY_URL = "https://ntfy.sh/raokaif_trading"
+
 WATCHLIST = {
-    "bitcoin": "BTC",
+    "bitcoin":  "BTC",
     "ethereum": "ETH",
-    "solana": "SOL",
-    "cardano": "ADA"
+    "solana":   "SOL",
+    "cardano":  "ADA"
 }
 
-def send_alert(title, message, priority="high"):
+def send_alert(symbol, signal, entry, t1, t2, detail):
+    title = f"SIGNAL: {symbol} — {signal}"
+    msg = (
+        f"Entry: {entry}\n"
+        f"Target 1: {t1}\n"
+        f"Target 2: {t2}\n"
+        f"Detail: {detail}\n"
+        f"Time: {time.strftime('%H:%M UTC')}"
+    )
     try:
         headers = {
             "Title": title,
-            "Priority": priority,
-            "Tags": "chart_with_upwards_trend,moneybag"
+            "Priority": "high",
+            "Tags": "chart_with_upwards_trend",
+            "Cache": "yes"
         }
-        requests.post(NTFY_URL, data=message.encode("utf-8"), headers=headers, timeout=10)
-        print(f"✅ Alert sent: {title}")
+        r = requests.post(
+            NTFY_URL,
+            data=msg.encode("utf-8"),
+            headers=headers,
+            timeout=15
+        )
+        if r.status_code == 200:
+            print(f"✅ Alert sent: {symbol} — {signal}")
+        else:
+            print(f"⚠️ Alert failed: {r.status_code}")
     except Exception as e:
         print(f"⚠️ Alert error: {e}")
 
 def get_candles(coin_id):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/ohlc?vs_currency=usd&days=7"
     try:
-        r = requests.get(url, timeout=15)
+        r = requests.get(url, timeout=20)
+        if r.status_code != 200:
+            print(f"⚠️ {coin_id} HTTP {r.status_code}")
+            return None
         data = r.json()
-        if not isinstance(data, list):
-            print(f"⚠️ CoinGecko error for {coin_id}: {data}")
+        if not isinstance(data, list) or len(data) < 35:
+            print(f"⚠️ {coin_id} not enough data")
             return None
         candles = []
         for c in data:
             try:
                 candles.append({
-                    "time":  c[0],
                     "open":  float(c[1]),
                     "high":  float(c[2]),
                     "low":   float(c[3]),
-                    "close": float(c[4]),
-                    "vol":   0.0
+                    "close": float(c[4])
                 })
-            except (ValueError, IndexError):
+            except:
                 continue
-        return candles if len(candles) >= 30 else None
+        print(f"✅ {coin_id}: {len(candles)} candles fetched")
+        return candles
     except Exception as e:
-        print(f"⚠️ Candle fetch error {coin_id}: {e}")
+        print(f"⚠️ {coin_id} error: {e}")
         return None
 
 def ema(closes, period):
+    if len(closes) < period:
+        return closes[-1]
     k = 2 / (period + 1)
-    val = closes[0]
-    for price in closes[1:]:
+    val = sum(closes[:period]) / period
+    for price in closes[period:]:
         val = price * k + val * (1 - k)
     return val
 
 def rsi(closes, period=14):
+    if len(closes) < period + 1:
+        return 50
     gains, losses = [], []
     for i in range(1, period + 1):
-        diff = closes[i] - closes[i - 1]
+        diff = closes[i] - closes[i-1]
         gains.append(max(diff, 0))
         losses.append(abs(min(diff, 0)))
-    avg_gain = sum(gains) / period
-    avg_loss = sum(losses) / period
-    if avg_loss == 0:
+    avg_g = sum(gains) / period
+    avg_l = sum(losses) / period
+    if avg_l == 0:
         return 100
-    rs = avg_gain / avg_loss
-    return 100 - (100 / (1 + rs))
+    return 100 - (100 / (1 + avg_g / avg_l))
 
 def bollinger(closes, period=20):
+    if len(closes) < period:
+        return closes[-1], closes[-1], closes[-1]
     recent = closes[-period:]
     mean = sum(recent) / period
-    std = (sum((x - mean) ** 2 for x in recent) / period) ** 0.5
-    return mean - 2 * std, mean, mean + 2 * std
+    std = (sum((x - mean)**2 for x in recent) / period) ** 0.5
+    return mean - 2*std, mean, mean + 2*std
 
 def analyze(coin_id, symbol, candles):
     closes = [c["close"] for c in candles]
 
+    # Guaranteed closed candle
     curr    = candles[-2]
+    prev    = candles[-3]
     c_close = curr["close"]
     c_low   = curr["low"]
+    c_high  = curr["high"]
 
+    # Past 15 candles window
     past       = candles[-17:-2]
-    past_highs = [c["high"] for c in past]
-    past_lows  = [c["low"]  for c in past]
-    high_15    = max(past_highs)
-    low_15     = min(past_lows)
+    high_15    = max(c["high"] for c in past)
+    low_15     = min(c["low"]  for c in past)
 
-    ema9     = ema(closes[-20:], 9)
-    ema21    = ema(closes[-30:], 21)
-    ema50    = ema(closes, 50)
-    rsi_val  = rsi(closes[-15:])
-    bb_lower, bb_mid, _ = bollinger(closes)
+    # Indicators
+    ema9       = ema(closes[-25:], 9)
+    ema21      = ema(closes[-35:], 21)
+    ema50      = ema(closes, 50)
+    rsi_val    = rsi(closes[-20:])
+    bb_low, bb_mid, bb_up = bollinger(closes)
 
-    prev_ema9  = ema(closes[-21:-1], 9)
-    prev_ema21 = ema(closes[-31:-1], 21)
+    prev_ema9  = ema(closes[-26:-1], 9)
+    prev_ema21 = ema(closes[-36:-1], 21)
 
-    signal  = None
-    target1 = None
-    target2 = None
-    invalid = None
-    detail  = ""
+    signal = None
+    detail = ""
+    t1 = t2 = None
 
+    entry = round(c_close, 4)
+
+    # Strategy 1: SMC Liquidity Sweep
     if c_low < low_15 and c_close > low_15 and c_close > ema50:
-        signal  = "SMC Liquidity Sweep ⚡"
-        detail  = f"Swept {low_15:.4f}, rejected up."
-        target1 = round(c_close * 1.02, 4)
-        target2 = round(c_close * 1.04, 4)
-        invalid = round(c_close * 0.97, 4)
+        signal = "SMC Liquidity Sweep"
+        detail = f"Swept low {round(low_15,4)}, rejected up. EMA50 ok."
+        t1 = round(c_close * 1.02, 4)
+        t2 = round(c_close * 1.04, 4)
 
+    # Strategy 2: Golden Sniper Fibonacci
     elif (high_15 - low_15) > 0:
-        fib50  = high_15 - 0.50  * (high_15 - low_15)
+        fib50  = high_15 - 0.500 * (high_15 - low_15)
         fib618 = high_15 - 0.618 * (high_15 - low_15)
         if c_low <= fib50 and c_close >= fib618 and c_close > ema50:
-            signal  = "Golden Sniper Fib 🎯"
-            detail  = f"Fib {fib618:.4f}-{fib50:.4f} hit."
-            target1 = round(c_close * 1.025, 4)
-            target2 = round(c_close * 1.05, 4)
-            invalid = round(c_close * 0.97, 4)
+            signal = "Golden Sniper Fib"
+            detail = f"Fib zone {round(fib618,4)}-{round(fib50,4)} hit."
+            t1 = round(c_close * 1.025, 4)
+            t2 = round(c_close * 1.050, 4)
 
+    # Strategy 3: EMA 9/21 Crossover
     if signal is None:
         if prev_ema9 < prev_ema21 and ema9 > ema21 and rsi_val > 50:
-            signal  = "EMA 9/21 Crossover 📈"
-            detail  = f"EMA9 crossed EMA21. RSI={rsi_val:.1f}"
-            target1 = round(c_close * 1.02, 4)
-            target2 = round(c_close * 1.035, 4)
-            invalid = round(c_close * 0.975, 4)
+            signal = "EMA 9/21 Crossover"
+            detail = f"EMA9 crossed EMA21 up. RSI={round(rsi_val,1)}"
+            t1 = round(c_close * 1.020, 4)
+            t2 = round(c_close * 1.035, 4)
 
+    # Strategy 4: Bollinger Band Bounce
     if signal is None:
-        if c_close <= bb_lower and candles[-2]["close"] > candles[-3]["close"]:
-            signal  = "BB Mean Reversion 📊"
-            detail  = f"Lower BB {bb_lower:.4f}, target {bb_mid:.4f}"
-            target1 = round(bb_mid, 4)
-            target2 = round(bb_mid * 1.01, 4)
-            invalid = round(c_close * 0.975, 4)
+        if c_close <= bb_low and c_close > prev["close"]:
+            signal = "BB Mean Reversion"
+            detail = f"Lower BB {round(bb_low,4)} hit, bouncing to {round(bb_mid,4)}"
+            t1 = round(bb_mid, 4)
+            t2 = round(bb_mid * 1.01, 4)
 
     if signal:
-        title = f"🚨 BUY SIGNAL: {symbol}"
-        msg = (
-            f"Strategy: {signal}\n"
-            f"Entry: {c_close:.4f}\n"
-            f"Target 1: {target1}\n"
-            f"Target 2: {target2}\n"
-            f"Invalidation: {invalid}\n"
-            f"Detail: {detail}\n"
-            f"Time: {time.strftime('%H:%M UTC')}"
-        )
-        print(f"🔥 SIGNAL: {symbol} — {signal}")
-        send_alert(title, msg)
+        print(f"🔥 {symbol}: {signal}")
+        send_alert(symbol, signal, entry, t1, t2, detail)
     else:
-        print(f"   • {symbol}: No setup.")
+        print(f"   {symbol}: No setup")
 
 def main():
-    print(f"🚀 Scan started: {time.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+    print(f"\n🚀 Scan: {time.strftime('%Y-%m-%d %H:%M:%S UTC')}")
     for coin_id, symbol in WATCHLIST.items():
         candles = get_candles(coin_id)
         if candles:
             analyze(coin_id, symbol, candles)
-        else:
-            print(f"⚠️ Skipping {symbol} — data issue.")
-    print("✅ Scan complete.")
+        time.sleep(3)
+    print("✅ Done.\n")
 
 main()
