@@ -27,29 +27,34 @@ def send_alert(symbol, signal, entry, t1, t2, detail):
             "Tags": "chart_with_upwards_trend",
             "Cache": "yes"
         }
-        r = requests.post(
-            NTFY_URL,
-            data=msg.encode("utf-8"),
-            headers=headers,
-            timeout=15
-        )
-        if r.status_code == 200:
-            print(f"✅ Alert sent: {symbol} — {signal}")
-        else:
-            print(f"⚠️ Alert failed: {r.status_code}")
+        requests.post(NTFY_URL, data=msg.encode("utf-8"), headers=headers, timeout=15)
+        print(f"✅ Alert sent: {symbol} — {signal}")
     except Exception as e:
         print(f"⚠️ Alert error: {e}")
+
+def send_status_heartbeat():
+    """Bot zinda hai ya nahi, ye check karne ke liye har 30 min baad chota alert"""
+    try:
+        headers = {
+            "Title": "STATUS: Bot Active 🤖",
+            "Priority": "low",
+            "Tags": "white_check_mark",
+            "Cache": "no"
+        }
+        msg = f"Market scanned successfully.\nNo setups found right now.\nTime: {time.strftime('%H:%M UTC')}"
+        requests.post(NTFY_URL, data=msg.encode("utf-8"), headers=headers, timeout=15)
+        print("✅ Status heartbeat sent to ntfy.")
+    except Exception as e:
+        print(f"⚠️ Status error: {e}")
 
 def get_candles(coin_id):
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/ohlc?vs_currency=usd&days=7"
     try:
         r = requests.get(url, timeout=20)
         if r.status_code != 200:
-            print(f"⚠️ {coin_id} HTTP {r.status_code}")
             return None
         data = r.json()
         if not isinstance(data, list) or len(data) < 35:
-            print(f"⚠️ {coin_id} not enough data")
             return None
         candles = []
         for c in data:
@@ -62,10 +67,8 @@ def get_candles(coin_id):
                 })
             except:
                 continue
-        print(f"✅ {coin_id}: {len(candles)} candles fetched")
         return candles
     except Exception as e:
-        print(f"⚠️ {coin_id} error: {e}")
         return None
 
 def ema(closes, period):
@@ -101,20 +104,16 @@ def bollinger(closes, period=20):
 
 def analyze(coin_id, symbol, candles):
     closes = [c["close"] for c in candles]
-
-    # Guaranteed closed candle
     curr    = candles[-2]
     prev    = candles[-3]
     c_close = curr["close"]
     c_low   = curr["low"]
     c_high  = curr["high"]
 
-    # Past 15 candles window
     past       = candles[-17:-2]
     high_15    = max(c["high"] for c in past)
     low_15     = min(c["low"]  for c in past)
 
-    # Indicators
     ema9       = ema(closes[-25:], 9)
     ema21      = ema(closes[-35:], 21)
     ema50      = ema(closes, 50)
@@ -127,7 +126,6 @@ def analyze(coin_id, symbol, candles):
     signal = None
     detail = ""
     t1 = t2 = None
-
     entry = round(c_close, 4)
 
     # Strategy 1: SMC Liquidity Sweep
@@ -164,23 +162,27 @@ def analyze(coin_id, symbol, candles):
             t2 = round(bb_mid * 1.01, 4)
 
     if signal:
-        print(f"🔥 {symbol}: {signal}")
         send_alert(symbol, signal, entry, t1, t2, detail)
-    else:
-        print(f"   {symbol}: No setup")
+        return True
+    return False
 
 def main():
-    # Yeh loop ab bot ko continuous chalaye rakhega
     while True:
         print(f"\n🚀 Scan Start: {time.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+        any_signal_found = False
+        
         for coin_id, symbol in WATCHLIST.items():
             candles = get_candles(coin_id)
             if candles:
-                analyze(coin_id, symbol, candles)
+                has_signal = analyze(coin_id, symbol, candles)
+                if has_signal:
+                    any_signal_found = True
             time.sleep(3)
-        print("✅ Scan Completed.")
         
-        # 30 minute (1800 seconds) tak rukne ke liye
+        # Agar kisi bhi coin me setup NAHI bana, to status update bhej do
+        if not any_signal_found:
+            send_status_heartbeat()
+            
         print("⏳ Sleeping for 30 minutes...")
         time.sleep(1800)
 
