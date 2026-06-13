@@ -170,12 +170,20 @@ def analyze(coin_id, symbol, candles):
         print(f"   {symbol}: No setup")
 
 def main():
-    print(f"\n🚀 Scan: {time.strftime('%Y-%m-%d %H:%M:%S UTC')}")
-    for coin_id, symbol in WATCHLIST.items():
-        candles = get_candles(coin_id)
-        if candles:
-            analyze(coin_id, symbol, candles)
-        time.sleep(3)
-    print("✅ Done.\n")
+    # Yeh loop ab bot ko continuous chalaye rakhega
+    while True:
+        print(f"\n🚀 Scan Start: {time.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+        for coin_id, symbol in WATCHLIST.items():
+            candles = get_candles(coin_id)
+            if candles:
+                analyze(coin_id, symbol, candles)
+            time.sleep(3)
+        print("✅ Scan Completed.")
+        
+        # 30 minute (1800 seconds) tak rukne ke liye
+        print("⏳ Sleeping for 30 minutes...")
+        time.sleep(1800)
 
-main()
+if __name__ == "__main__":
+    main()
+        
