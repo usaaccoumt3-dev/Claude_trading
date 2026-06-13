@@ -1,6 +1,5 @@
 import requests
 import time
-import json
 
 NTFY_URL = "https://ntfy.sh/raokaif_trading"
 
@@ -33,7 +32,6 @@ def send_alert(symbol, signal, entry, t1, t2, detail):
         print(f"⚠️ Alert error: {e}")
 
 def send_status_heartbeat():
-    """Bot zinda hai ya nahi, ye check karne ke liye har 30 min baad chota alert"""
     try:
         headers = {
             "Title": "STATUS: Bot Active 🤖",
@@ -179,7 +177,6 @@ def main():
                     any_signal_found = True
             time.sleep(3)
         
-        # Agar kisi bhi coin me setup NAHI bana, to status update bhej do
         if not any_signal_found:
             send_status_heartbeat()
             
@@ -188,4 +185,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-        
