@@ -1,7 +1,7 @@
 name: Run Trading Bot Continuous
 
 on:
-  workflow_dispatch: # Taake aap sirf aik baar manually button daba kar isay hamesha ke liye start kar dein
+  workflow_dispatch:
 
 jobs:
   run-bot-loop:
@@ -18,12 +18,12 @@ jobs:
       - name: Install Dependencies
         run: pip install requests
 
-      - name: Run Script in 30 Minute Loop
+      - name: Run Script in 10 Minute Loop
         run: |
           echo "Starting the endless background trading loop..."
           while true; do
             python bot.py
-            echo "Scan complete. Waiting exactly 30 minutes for the next scan..."
-            sleep 1800
+            echo "Scan complete. Waiting exactly 10 minutes for the next scan..."
+            sleep 600
           done
           
