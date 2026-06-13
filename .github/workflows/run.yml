@@ -2,7 +2,7 @@ name: Trading Bot
 
 on:
   schedule:
-    - cron: '*/30 * * * *'
+    - cron: '0 */6 * * *'  # Har 6 ghante baad chalu hoga
   workflow_dispatch:
 
 jobs:
@@ -18,3 +18,4 @@ jobs:
         run: pip install requests
       - name: Run bot
         run: python bot.py
+        
