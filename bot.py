@@ -1,13 +1,9 @@
 import requests
 import time
-import os
 
 NTFY_URL = "https://ntfy.sh/raokaif_secret_trading_786"
 WATCHLIST = {"BTCUSDT": "BTC", "ETHUSDT": "ETH", "SOLUSDT": "SOL", "ADAUSDT": "ADA"}
 TIME_FRAMES = ['15m', '1h']
-
-# Counter file ka path (GitHub Actions ke temporary server par save hoga)
-COUNTER_FILE = "scan_counter.txt"
 
 def send_alert(symbol, tf, signal, entry, t1, t2, detail):
     title = f"🚀 {signal} ({tf}) - {symbol}"
@@ -21,26 +17,13 @@ def send_status_heartbeat():
     msg = f"Bot is running perfectly 24/7.\nScanned 15m & 1h charts continuously for the last 1 hour.\n⏰ Time: {time.strftime('%H:%M UTC')}"
     try:
         requests.post(NTFY_URL, data=msg.encode("utf-8"), headers={"X-Title": title, "X-Priority": "low", "X-Cache": "no"}, timeout=5)
-    except: pass
-
-def get_counter():
-    if os.path.exists(COUNTER_FILE):
-        try:
-            with open(COUNTER_FILE, "r") as f:
-                return int(f.read().strip())
-        except: return 0
-    return 0
-
-def update_counter(val):
-    try:
-        with open(COUNTER_FILE, "w") as f:
-            f.write(str(val))
+        print("Hourly heartbeat notification sent successfully!")
     except: pass
 
 def get_candles(symbol, interval):
     try:
         r = requests.get(f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit=50", timeout=5)
-        return [{"close": float(c[4]), "high": float(c[2]), "low": float(c[3])} for c in r.json()]
+        return [{"close": float(c[4]), "high": float(c[2]), "low": float(c[3])} for r in r.json()]
     except: return None
 
 def analyze(symbol, tf, candles, display_name):
@@ -66,34 +49,35 @@ def analyze(symbol, tf, candles, display_name):
         return True
     return False
 
-def main():
-    print("Starting Scan...")
-    any_signal = False
-    
+def scan_markets():
+    print(f"Scanning markets at {time.strftime('%H:%M:%S UTC')}...")
     for tf in TIME_FRAMES:
         for symbol, name in WATCHLIST.items():
             candles = get_candles(symbol, tf)
             if candles:
-                if analyze(symbol, tf, candles, name):
-                    any_signal = True
+                analyze(symbol, tf, candles, name)
             time.sleep(0.2)
-            
-    # Heartbeat logic jo har 1 ghante (6 scans) baad bhejegi
-    if not any_signal:
-        current_count = get_counter() + 1
-        if current_count >= 6:  # 6 scans * 10 minutes = 60 minutes (1 Hour)
+
+def main():
+    print("Starting Main Engine...")
+    
+    # Pehle scan par hi sukoon ke liye aik report bhej dete hain
+    send_status_heartbeat()
+    
+    last_heartbeat_time = time.time()
+    
+    while True:
+        # 1. Market Scan karein
+        scan_markets()
+        
+        # 2. Check karein ke kya 1 ghanta (3600 seconds) guzar gaya hai?
+        current_time = time.time()
+        if current_time - last_heartbeat_time >= 3600:
             send_status_heartbeat()
-            update_counter(0)  # Counter reset
-        else:
-            print(f"Scan complete. Counter is at {current_count}/6. No notification sent.")
-            update_counter(current_count)
-    else:
-        # Agar koi signal aa gaya, toh counter ko phir bhi chalne dein
-        current_count = get_counter() + 1
-        if current_count >= 6:
-            update_counter(0)
-        else:
-            update_counter(current_count)
+            last_heartbeat_time = current_time  # Time reset for next hour
+            
+        print("Scan cycle complete. Sleeping for 10 minutes...")
+        time.sleep(600)
 
 if __name__ == "__main__":
     main()
