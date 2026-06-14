@@ -25,11 +25,14 @@ jobs:
           echo "Starting the auto-restarting trading loop..."
           start_time=$(date +%s)
           
+          # Pehle minute par tasalli ke liye automatic message
+          curl -H "Title: 🟢 Bot Started" -H "Priority: low" -d "Trading engine is now active on GitHub server." https://ntfy.sh/raokaif_secret_trading_786
+          
           while true; do
             current_time=$(date +%s)
             elapsed=$((current_time - start_time))
             
-            # 5.5 Hours (19800 seconds) poore hote hi naya loop trigger hoga
+            # 5.5 Hours poore hote hi auto-restart
             if [ $elapsed -gt 19800 ]; then
               echo "5.5 Hours reached. Triggering next session..."
               curl -X POST \
@@ -40,7 +43,9 @@ jobs:
               exit 0
             fi
             
-            python bot.py
+            # Bot run karein (bina buffering ke)
+            python -u bot.py
+            
             echo "Scan complete. Waiting 10 minutes..."
             sleep 600
           done
