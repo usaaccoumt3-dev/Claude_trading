@@ -18,12 +18,30 @@ jobs:
       - name: Install Dependencies
         run: pip install requests
 
-      - name: Run Script in 10 Minute Loop
+      - name: Run Script in Smart Loop
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Starting the endless background trading loop..."
+          echo "Starting the auto-restarting trading loop..."
+          start_time=$(date +%s)
+          
           while true; do
+            current_time=$(date +%s)
+            elapsed=$((current_time - start_time))
+            
+            # 5.5 Hours (19800 seconds) poore hote hi naya loop trigger hoga
+            if [ $elapsed -gt 19800 ]; then
+              echo "5.5 Hours reached. Triggering next session..."
+              curl -X POST \
+                -H "Authorization: token $GITHUB_TOKEN" \
+                -H "Accept: application/vnd.github.v3+json" \
+                https://api.github.com/repos/${{ github.repository }}/actions/workflows/run_bot.yml/dispatches \
+                -d '{"ref":"main"}'
+              exit 0
+            fi
+            
             python bot.py
-            echo "Scan complete. Waiting exactly 10 minutes for the next scan..."
+            echo "Scan complete. Waiting 10 minutes..."
             sleep 600
           done
           
