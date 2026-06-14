@@ -3,7 +3,7 @@ name: Run Trading Bot Continuous
 on:
   push:
     branches: [ main ]
-  workflow_dispatch: # Taake aap manually b button daba kar start kar sako
+  workflow_dispatch: # Is se aap manually bhi start kar sakte hain
 
 jobs:
   run-bot-loop:
@@ -26,5 +26,5 @@ jobs:
     - name: Run Script in Smart Loop
       run: |
         echo "Starting the auto-restarting trading loop..."
-        python bot.py
+        python -u bot.py
         
