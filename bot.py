@@ -27,8 +27,9 @@ active_trades = {}
 
 def notify(title, msg, tags="chart_with_upwards_trend"):
     try:
-        r = requests.post(NTFY_URL, data=msg.encode('utf-8'),
-            headers={"Title": title, "Priority": "high", "Tags": tags}, timeout=10)
+        # Encoding error solve karne ke liye fix
+        headers = {"Title": title, "Priority": "high", "Tags": tags}
+        r = requests.post(NTFY_URL, data=msg.encode('utf-8'), headers=headers, timeout=10)
         print(f"[NOTIF] {title} — status:{r.status_code}")
     except Exception as e:
         print(f"[NOTIF ERROR] {e}")
@@ -119,7 +120,7 @@ def send_signal(symbol, strategy, market, entry, sl, tp1, tp2):
         f"RR:     1:{rr}\n"
         f"Strategy: {strategy}"
     )
-    notify(f"🟢 BUY | {strategy}", msg)
+    notify(f"BUY | {strategy}", msg)
     active_trades[symbol] = {'entry': entry, 'tp1': tp1, 'tp2': tp2, 'sl': sl}
 
 def strat_sweep(df, symbol):
@@ -205,12 +206,12 @@ def monitor(df, symbol):
     t = active_trades[symbol]
     c = df.iloc[-1]
     if c['high'] >= t['tp2']:
-        notify("🎯 TP2 HIT!", f"{symbol}\nFull target!\nTP2: {t['tp2']:.4f}", tags="trophy,fire")
+        notify("TP2 HIT!", f"{symbol}\nFull target!\nTP2: {t['tp2']:.4f}", tags="trophy,fire")
         active_trades.pop(symbol, None)
     elif c['high'] >= t['tp1']:
-        notify("💰 TP1 HIT!", f"{symbol}\nTP1: {t['tp1']:.4f} hit!\nMove SL to entry!", tags="money_bag")
+        notify("TP1 HIT!", f"{symbol}\nTP1: {t['tp1']:.4f} hit!\nMove SL to entry!", tags="money_bag")
     elif c['low'] <= t['sl']:
-        notify("🔴 SL HIT", f"{symbol}\nSL: {t['sl']:.4f}", tags="red_circle")
+        notify("SL HIT", f"{symbol}\nSL: {t['sl']:.4f}", tags="red_circle")
         active_trades.pop(symbol, None)
 
 last_report = time.time()
@@ -220,7 +221,7 @@ def hourly_report():
     global last_report, scan_count
     if time.time() - last_report >= 3600:
         active = list(active_trades.keys()) or ["None"]
-        notify("🤖 Alhamdulillah — Bot Active",
+        notify("Alhamdulillah — Bot Active",
             f"Scans: {scan_count}\n"
             f"Active: {', '.join(active)}\n"
             f"Session: {'ON' if is_good_session() else 'OFF'}\n"
@@ -233,12 +234,12 @@ def run():
     global scan_count
     start_time = time.time()
     print("[START] Bot starting...")
-    notify("🚀 Bot Started", "Crypto Spot Bot Live!\nBTC ETH SOL AVAX\n100% Halal Spot Only", tags="rocket")
+    notify("Bot Started", "Crypto Spot Bot Live!\nBTC ETH SOL AVAX\n100% Halal Spot Only", tags="rocket")
     print("[START] Startup notification sent!")
 
     while True:
         if time.time() - start_time > 19800:
-            notify("🔄 Auto Restart", "5.5hr done — restarting now", tags="arrows_counterclockwise")
+            notify("Auto Restart", "5.5hr done — restarting now", tags="arrows_counterclockwise")
             print("[EXIT] Time limit reached")
             break
 
