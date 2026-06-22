@@ -14,12 +14,12 @@ NEWS_TIMES_UTC = [(8,30),(14,0),(14,30),(18,0)]
 NEWS_BLOCK_MIN = 30
 
 try:
-    # Binance ki jagah ab Bybit use hoga jo GitHub par block nahi hota
-    exchange = ccxt.bybit({
+    # MEXC ka connection (Ye GitHub Actions par block nahi hoga)
+    exchange = ccxt.mexc({
         'enableRateLimit': True,
         'options': {'defaultType': 'spot'}
     })
-    print("[OK] Exchange (Bybit) connected")
+    print("[OK] Exchange (MEXC) connected")
 except Exception as e:
     print(f"[FATAL] Exchange error: {e}")
     exit(1)
@@ -314,4 +314,4 @@ def run():
 
 if __name__ == '__main__':
     run()
-        
+                    
