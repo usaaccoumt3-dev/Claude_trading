@@ -23,4 +23,4 @@ jobs:
         run: pip install ccxt pandas numpy requests
 
       - name: Run Bot
-        run: python bot.py
+        run: python bot.py || true
