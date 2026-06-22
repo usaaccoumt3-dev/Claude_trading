@@ -14,11 +14,12 @@ NEWS_TIMES_UTC = [(8,30),(14,0),(14,30),(18,0)]
 NEWS_BLOCK_MIN = 30
 
 try:
-    exchange = ccxt.binance({
+    # Binance ki jagah ab Bybit use hoga jo GitHub par block nahi hota
+    exchange = ccxt.bybit({
         'enableRateLimit': True,
         'options': {'defaultType': 'spot'}
     })
-    print("[OK] Exchange connected")
+    print("[OK] Exchange (Bybit) connected")
 except Exception as e:
     print(f"[FATAL] Exchange error: {e}")
     exit(1)
@@ -27,7 +28,6 @@ active_trades = {}
 
 def notify(title, msg, tags="chart_with_upwards_trend"):
     try:
-        # Encoding error solve karne ke liye fix
         headers = {"Title": title, "Priority": "high", "Tags": tags}
         r = requests.post(NTFY_URL, data=msg.encode('utf-8'), headers=headers, timeout=10)
         print(f"[NOTIF] {title} — status:{r.status_code}")
@@ -234,7 +234,7 @@ def run():
     global scan_count
     start_time = time.time()
     print("[START] Bot starting...")
-    notify("Bot Started", "Crypto Spot Bot Live!\nBTC ETH SOL AVAX\n100% Halal Spot Only", tags="rocket")
+    notify("Bot Started", "Crypto Spot Bot Live!\nBTC ETH SOL AVAX\n100% Halal Spot Only")
     print("[START] Startup notification sent!")
 
     while True:
@@ -314,3 +314,4 @@ def run():
 
 if __name__ == '__main__':
     run()
+        
