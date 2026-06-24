@@ -163,16 +163,26 @@ class Optimizer:
             w = v.get('wins', 0)
             l = v.get('losses', 0)
             wt = v.get('weight', 1.0)
-            strat_lines += f"  {s}: {w}W/{l}L (weight:{wt:.1f})\n"
+            strat_lines += f"  {s}: {w}W/{l}L (weight:{wt:.1f})
+"
 
         msg = (
-            f"Date: {yest}\n"
-            f"Total Trades: {total}\n"
-            f"Wins: {wins} | Losses: {losses}\n"
-            f"Win Rate: {wr}%\n\n"
-            f"Strategy Performance:\n{strat_lines}\n"
-            f"Best Strategy: {best_s or 'N/A'}\n"
-            f"Best Pair: {best_p or 'N/A'}\n"
+            f"Date: {yest}
+"
+            f"Total Trades: {total}
+"
+            f"Wins: {wins} | Losses: {losses}
+"
+            f"Win Rate: {wr}%
+
+"
+            f"Strategy Performance:
+{strat_lines}
+"
+            f"Best Strategy: {best_s or 'N/A'}
+"
+            f"Best Pair: {best_p or 'N/A'}
+"
             f"Exchange: {exchange_name}"
         )
         notify("📊 Daily Report", msg, tags="bar_chart,calendar")
@@ -293,15 +303,24 @@ def send_signal(symbol, strategy, market, entry, sl, tp1, tp2):
     rr     = round((tp1 - entry) / max(entry - sl, 1e-10), 1)
     session = get_session_name()
     msg = (
-        f"Coin: {symbol}\n"
-        f"Strategy: {strategy}\n"
-        f"Market: {market}\n"
-        f"Session: {session}\n"
-        f"Entry:  {entry:.4f}\n"
-        f"TP1:    {tp1:.4f}  (+{((tp1-entry)/entry*100):.1f}%)\n"
-        f"TP2:    {tp2:.4f}  (+{((tp2-entry)/entry*100):.1f}%)\n"
-        f"SL:     {sl:.4f}   (-{((entry-sl)/entry*100):.1f}%)\n"
-        f"RR:     1:{rr}\n"
+        f"Coin: {symbol}
+"
+        f"Strategy: {strategy}
+"
+        f"Market: {market}
+"
+        f"Session: {session}
+"
+        f"Entry:  {entry:.4f}
+"
+        f"TP1:    {tp1:.4f}  (+{((tp1-entry)/entry*100):.1f}%)
+"
+        f"TP2:    {tp2:.4f}  (+{((tp2-entry)/entry*100):.1f}%)
+"
+        f"SL:     {sl:.4f}   (-{((entry-sl)/entry*100):.1f}%)
+"
+        f"RR:     1:{rr}
+"
         f"Weight: {weight:.1f}/2.0"
     )
     notify(f"BUY | {strategy}", msg)
@@ -547,25 +566,4 @@ def run():
                         time.sleep(1)
                         if symbol not in active_trades:
                             strat_breakout(df15, symbol)
-                                            time.sleep(1)
-                            if symbol not in active_trades:
-                                strat_day_breakout(df15, symbol)
-                                time.sleep(1)
-                                if symbol not in active_trades:
-                                    strat_opportunity(df15, symbol)
-
-                        time.sleep(2)
-
-                    except Exception as e:
-                        print(f"[SYMBOL ERR] {symbol}: {e}")
-                        time.sleep(2)
-
-                scan_count += 1
-                time.sleep(30)
-
-            except Exception as e:
-                print(f"[MAIN ERR] {e}")
-                time.sleep(30)
-
-    if __name__ == "__main__":
-        run()
+                            time.sl
