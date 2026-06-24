@@ -541,5 +541,74 @@ Exchange: " + exchange_name + "
             hourly_report()
 
             now = datetime.now(timezone.utc)
-            print("
-[TIME] " + now.strftime('%d-%b %H:%M') + " 
+                        print("[TIME] " + now.strftime('%d-%b %H:%M') + " UTC", flush=True)
+
+            if is_news_time():
+                print("[SKIP] News time - 10min wait", flush=True)
+                time.sleep(600)
+                continue
+
+            if not is_good_session():
+                print("[SKIP] Outside session", flush=True)
+                time.sleep(60)
+                continue
+
+            print("\n" + "="*45, flush=True)
+            print("[SCAN #" + str(scan_count+1) + "] " + now.strftime('%d-%b %H:%M') + " UTC | " + exchange_name, flush=True)
+            print("="*45, flush=True)
+
+            for symbol in SYMBOLS:
+                try:
+                    print("\n--- " + symbol + " ---", flush=True)
+                    df15 = get_df(symbol, TF_ENTRY)
+                    if df15 is None or df15.empty:
+                        print("[" + symbol + "] No data", flush=True)
+                        continue
+
+                    # Monitor active trade
+                    if symbol in active_trades:
+                        monitor(df15, symbol)
+                        print("[" + symbol + "] Monitoring active trade", flush=True)
+                        continue
+
+                    # Uptrend filter
+                    if not is_uptrend(symbol):
+                        print("[" + symbol + "] Below EMA200 - skip", flush=True)
+                        continue
+
+                    # Volume check
+                    spike, vol_ma = is_volume_spike(df15)
+
+                    # Market type via volume
+                    mkt = market_type(df15)
+
+                    if mkt == "RANGING":
+                        strat_sweep(df15, symbol)
+                    else:
+                        strat_ema_pullback(df15, symbol)
+                        time.sleep(1)
+                        if symbol not in active_trades:
+                            strat_breakout(df15, symbol)
+                            time.sleep(1)
+                            if symbol not in active_trades:
+                                strat_day_breakout(df15, symbol)
+                                time.sleep(1)
+                                if symbol not in active_trades:
+                                    strat_opportunity(df15, symbol)
+
+                    time.sleep(2)
+
+                except Exception as e:
+                    print("[SYMBOL ERR] " + symbol + ": " + str(e), flush=True)
+                    time.sleep(2)
+
+            scan_count += 1
+            print("\n[OK] Scan complete. Waiting 10 minutes for next cycle...", flush=True)
+            time.sleep(30)
+
+        except Exception as e:
+            print("[MAIN ERR] " + str(e), flush=True)
+            time.sleep(30)
+
+if __name__ == "__main__":
+    run()
