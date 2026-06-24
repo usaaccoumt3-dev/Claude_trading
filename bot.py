@@ -547,4 +547,25 @@ def run():
                         time.sleep(1)
                         if symbol not in active_trades:
                             strat_breakout(df15, symbol)
-                
+                                            time.sleep(1)
+                            if symbol not in active_trades:
+                                strat_day_breakout(df15, symbol)
+                                time.sleep(1)
+                                if symbol not in active_trades:
+                                    strat_opportunity(df15, symbol)
+
+                        time.sleep(2)
+
+                    except Exception as e:
+                        print(f"[SYMBOL ERR] {symbol}: {e}")
+                        time.sleep(2)
+
+                scan_count += 1
+                time.sleep(30)
+
+            except Exception as e:
+                print(f"[MAIN ERR] {e}")
+                time.sleep(30)
+
+    if __name__ == "__main__":
+        run()
