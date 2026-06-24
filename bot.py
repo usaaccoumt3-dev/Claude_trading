@@ -164,26 +164,18 @@ class Optimizer:
             w = v.get('wins', 0)
             l = v.get('losses', 0)
             wt = v.get('weight', 1.0)
-            strat_lines += "  " + s + ": " + str(w) + "W/" + str(l) + "L (weight:" + str(round(wt, 1)) + ")
+            strat_lines += "  " + s + ": " + str(w) + "W/" + str(l) + "L (weight:" + str(round(wt, 1)) + ")\n"
 "
 
-        msg = (
-            "Date: " + yest + "
-"
-            "Total Trades: " + str(total) + "
-"
-            "Wins: " + str(wins) + " | Losses: " + str(losses) + "
-"
-            "Win Rate: " + str(wr) + "%
-
-"
-            "Strategy Performance:
-" + strat_lines + "
-"
-            "Best Strategy: " + str(best_s or 'N/A') + "
-"
-            "Best Pair: " + str(best_p or 'N/A') + "
-"
+                msg = (
+            "Date: " + yest + "\n"
+            "Total Trades: " + str(total) + "\n"
+            "Wins: " + str(wins) + " | Losses: " + str(losses) + "\n"
+            "Win Rate: " + str(wr) + "%\n\n"
+            "Strategy Performance:\n"
+            + strat_lines + "\n\n"
+            "Best Strategy: " + str(best_s or 'N/A') + "\n\n"
+            "Best Pair: " + str(best_p or 'N/A') + "\n\n"
             "Exchange: " + exchange_name
         )
         notify("Daily Report", msg, tags="bar_chart,calendar")
