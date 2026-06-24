@@ -7,9 +7,7 @@ import json
 import os
 from datetime import datetime, timezone, timedelta
 
-# ═══════════════════════════════════════
 # CONFIGURATION
-# ═══════════════════════════════════════
 NTFY_URL       = "https://ntfy.sh/raokaif_secret_trading_786"
 SYMBOLS        = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'AVAX/USDT']
 TF_ENTRY       = '15m'
@@ -18,10 +16,8 @@ PERF_FILE      = 'bot_performance.json'
 NEWS_TIMES_UTC = [(8,30),(14,0),(14,30),(18,0)]
 NEWS_BLOCK_MIN = 30
 
-# ═══════════════════════════════════════
 # MULTI-EXCHANGE FAILOVER
-# MEXC → Binance → Bybit
-# ═══════════════════════════════════════
+# MEXC -> Binance -> Bybit
 def connect_exchange():
     brokers = [
         ('MEXC',    ccxt.mexc,    {'enableRateLimit': True, 'options': {'defaultType': 'spot'}}),
@@ -41,9 +37,7 @@ def connect_exchange():
 
 exchange, exchange_name = connect_exchange()
 
-# ═══════════════════════════════════════
 # PERFORMANCE TRACKER / SELF-OPTIMIZER
-# ═══════════════════════════════════════
 class Optimizer:
     def __init__(self):
         self.data = self.load()
@@ -121,7 +115,7 @@ class Optimizer:
         self.data['daily'][today]['trades'].append(trade)
 
         self.save()
-        print(f"[OPT] Trade closed: {symbol} → {result}")
+        print(f"[OPT] Trade closed: {symbol} -> {result}")
 
     def get_weight(self, strategy):
         s = self.data['strategies'].get(strategy, {})
@@ -163,54 +157,38 @@ class Optimizer:
             w = v.get('wins', 0)
             l = v.get('losses', 0)
             wt = v.get('weight', 1.0)
-            strat_lines += f"  {s}: {w}W/{l}L (weight:{wt:.1f})
-"
+            strat_lines += f"  {s}: {w}W/{l}L (weight:{wt:.1f})\n"
 
         msg = (
-            f"Date: {yest}
-"
-            f"Total Trades: {total}
-"
-            f"Wins: {wins} | Losses: {losses}
-"
-            f"Win Rate: {wr}%
-
-"
-            f"Strategy Performance:
-{strat_lines}
-"
-            f"Best Strategy: {best_s or 'N/A'}
-"
-            f"Best Pair: {best_p or 'N/A'}
-"
+            f"Date: {yest}\n"
+            f"Total Trades: {total}\n"
+            f"Wins: {wins} | Losses: {losses}\n"
+            f"Win Rate: {wr}%\n\n"
+            f"Strategy Performance:\n{strat_lines}\n"
+            f"Best Strategy: {best_s or 'N/A'}\n"
+            f"Best Pair: {best_p or 'N/A'}\n"
             f"Exchange: {exchange_name}"
         )
-        notify("📊 Daily Report", msg, tags="bar_chart,calendar")
+        notify("Daily Report", msg, tags="bar_chart,calendar")
         self.data['last_daily_report'] = today
         self.save()
         print(f"[REPORT] Daily report sent for {yest}")
 
 optimizer = Optimizer()
 
-# ═══════════════════════════════════════
 # ACTIVE TRADES (runtime)
-# ═══════════════════════════════════════
 active_trades = {}
 
-# ═══════════════════════════════════════
 # NOTIFICATION
-# ═══════════════════════════════════════
 def notify(title, msg, tags="chart_with_upwards_trend"):
     try:
         headers = {"Title": title, "Priority": "high", "Tags": tags}
         r = requests.post(NTFY_URL, data=msg.encode('utf-8'), headers=headers, timeout=15)
-        print(f"[NOTIF] {title} — {r.status_code}")
+        print(f"[NOTIF] {title} - {r.status_code}")
     except Exception as e:
         print(f"[NOTIF ERR] {e}")
 
-# ═══════════════════════════════════════
 # FILTERS
-# ═══════════════════════════════════════
 def is_news_time():
     now = datetime.now(timezone.utc)
     for (h, m) in NEWS_TIMES_UTC:
@@ -230,18 +208,16 @@ def get_session_name():
         return "NewYork"
     return "Off"
 
-# ═══════════════════════════════════════
 # DATA FETCH WITH FAILOVER
-# ═══════════════════════════════════════
 def get_df(symbol, timeframe, limit=200):
     global exchange, exchange_name
     try:
         data = exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
         df   = pd.DataFrame(data, columns=['ts','open','high','low','close','volume'])
-        print(f"[DATA] {symbol} {timeframe} {len(df)} candles — {exchange_name}")
+        print(f"[DATA] {symbol} {timeframe} {len(df)} candles - {exchange_name}")
         return df
     except Exception as e:
-        print(f"[FETCH ERR] {exchange_name} {symbol}: {e} — trying failover")
+        print(f"[FETCH ERR] {exchange_name} {symbol}: {e} - trying failover")
         exchange, exchange_name = connect_exchange()
         try:
             data = exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
@@ -252,9 +228,7 @@ def get_df(symbol, timeframe, limit=200):
             print(f"[FETCH FATAL] {symbol}: {e2}")
             return None
 
-# ═══════════════════════════════════════
 # INDICATORS
-# ═══════════════════════════════════════
 def ema(df, p):
     return df['close'].ewm(span=p, adjust=False).mean()
 
@@ -272,7 +246,6 @@ def is_uptrend(symbol):
     print(f"[TREND] {symbol}: {'UP' if result else 'DOWN'}")
     return result
 
-# Volume spike = market momentum
 def is_volume_spike(df):
     vol_ma  = df['volume'].rolling(20).mean().iloc[-1]
     cur_vol = df['volume'].iloc[-1]
@@ -280,17 +253,14 @@ def is_volume_spike(df):
     print(f"[VOL] cur:{cur_vol:.0f} ma:{vol_ma:.0f} spike:{spike}")
     return spike, vol_ma
 
-# Market type via volume momentum
 def market_type(df):
     vol_ma  = df['volume'].rolling(20).mean().iloc[-1]
     recent  = df['volume'].iloc[-5:].mean()
     mkt     = "TRENDING" if recent > vol_ma * 1.3 else "RANGING"
-    print(f"[MKT] recent_vol:{recent:.0f} ma:{vol_ma:.0f} — {mkt}")
+    print(f"[MKT] recent_vol:{recent:.0f} ma:{vol_ma:.0f} - {mkt}")
     return mkt
 
-# ═══════════════════════════════════════
 # TARGETS
-# ═══════════════════════════════════════
 def calc_targets(entry, atr_v, rr1=2.5, rr2=4.5, sl_m=1.5):
     sl   = entry - atr_v * sl_m
     risk = entry - sl
@@ -303,24 +273,15 @@ def send_signal(symbol, strategy, market, entry, sl, tp1, tp2):
     rr     = round((tp1 - entry) / max(entry - sl, 1e-10), 1)
     session = get_session_name()
     msg = (
-        f"Coin: {symbol}
-"
-        f"Strategy: {strategy}
-"
-        f"Market: {market}
-"
-        f"Session: {session}
-"
-        f"Entry:  {entry:.4f}
-"
-        f"TP1:    {tp1:.4f}  (+{((tp1-entry)/entry*100):.1f}%)
-"
-        f"TP2:    {tp2:.4f}  (+{((tp2-entry)/entry*100):.1f}%)
-"
-        f"SL:     {sl:.4f}   (-{((entry-sl)/entry*100):.1f}%)
-"
-        f"RR:     1:{rr}
-"
+        f"Coin: {symbol}\n"
+        f"Strategy: {strategy}\n"
+        f"Market: {market}\n"
+        f"Session: {session}\n"
+        f"Entry:  {entry:.4f}\n"
+        f"TP1:    {tp1:.4f}  (+{((tp1-entry)/entry*100):.1f}%)\n"
+        f"TP2:    {tp2:.4f}  (+{((tp2-entry)/entry*100):.1f}%)\n"
+        f"SL:     {sl:.4f}   (-{((entry-sl)/entry*100):.1f}%)\n"
+        f"RR:     1:{rr}\n"
         f"Weight: {weight:.1f}/2.0"
     )
     notify(f"BUY | {strategy}", msg)
@@ -330,14 +291,12 @@ def send_signal(symbol, strategy, market, entry, sl, tp1, tp2):
     }
     optimizer.record_signal(symbol, strategy, session, entry, sl, tp1, tp2)
 
-# ═══════════════════════════════════════
-# STRATEGY 1 — SWEEP (Ranging)
-# ═══════════════════════════════════════
+# STRATEGY 1 - SWEEP (Ranging)
 def strat_sweep(df, symbol):
     try:
         w = optimizer.get_weight('SWEEP')
         if w < 0.3:
-            print(f"[SWEEP] Skipped — low weight {w:.1f}")
+            print(f"[SWEEP] Skipped - low weight {w:.1f}")
             return
         c      = df.iloc[-1]
         p      = df.iloc[-2]
@@ -354,14 +313,12 @@ def strat_sweep(df, symbol):
     except Exception as e:
         print(f"[SWEEP ERR] {e}")
 
-# ═══════════════════════════════════════
-# STRATEGY 2 — EMA PULLBACK (Trending)
-# ═══════════════════════════════════════
+# STRATEGY 2 - EMA PULLBACK (Trending)
 def strat_ema_pullback(df, symbol):
     try:
         w = optimizer.get_weight('EMA_PULLBACK')
         if w < 0.3:
-            print(f"[EMA] Skipped — low weight {w:.1f}")
+            print(f"[EMA] Skipped - low weight {w:.1f}")
             return
         df         = df.copy()
         df['e20']  = ema(df, 20)
@@ -382,14 +339,12 @@ def strat_ema_pullback(df, symbol):
     except Exception as e:
         print(f"[EMA ERR] {e}")
 
-# ═══════════════════════════════════════
-# STRATEGY 3 — BREAKOUT (Trending)
-# ═══════════════════════════════════════
+# STRATEGY 3 - BREAKOUT (Trending)
 def strat_breakout(df, symbol):
     try:
         w = optimizer.get_weight('BREAKOUT')
         if w < 0.3:
-            print(f"[BREAK] Skipped — low weight {w:.1f}")
+            print(f"[BREAK] Skipped - low weight {w:.1f}")
             return
         atr_v  = atr(df).iloc[-1]
         vol_ma = df['volume'].rolling(20).mean().iloc[-1]
@@ -406,15 +361,13 @@ def strat_breakout(df, symbol):
     except Exception as e:
         print(f"[BREAK ERR] {e}")
 
-# ═══════════════════════════════════════
-# STRATEGY 4 — DAY HIGH/LOW BREAKOUT
+# STRATEGY 4 - DAY HIGH/LOW BREAKOUT
 # 96 candles = 24 hours on 15m TF
-# ═══════════════════════════════════════
 def strat_day_breakout(df, symbol):
     try:
         w = optimizer.get_weight('DAY_BREAKOUT')
         if w < 0.3:
-            print(f"[DAY] Skipped — low weight {w:.1f}")
+            print(f"[DAY] Skipped - low weight {w:.1f}")
             return
         atr_v    = atr(df).iloc[-1]
         vol_ma   = df['volume'].rolling(20).mean().iloc[-1]
@@ -431,10 +384,8 @@ def strat_day_breakout(df, symbol):
     except Exception as e:
         print(f"[DAY ERR] {e}")
 
-# ═══════════════════════════════════════
 # BONUS OPPORTUNITY HUNTER
 # High volume + big candle = extra signal
-# ═══════════════════════════════════════
 def strat_opportunity(df, symbol):
     try:
         c      = df.iloc[-1]
@@ -452,9 +403,7 @@ def strat_opportunity(df, symbol):
     except Exception as e:
         print(f"[OPP ERR] {e}")
 
-# ═══════════════════════════════════════
 # TRADE MONITOR
-# ═══════════════════════════════════════
 def monitor(df, symbol):
     if symbol not in active_trades:
         return
@@ -471,9 +420,7 @@ def monitor(df, symbol):
         optimizer.close_trade(symbol, 'loss')
         active_trades.pop(symbol, None)
 
-# ═══════════════════════════════════════
 # HOURLY REPORT
-# ═══════════════════════════════════════
 last_report = time.time()
 scan_count  = 0
 
@@ -483,7 +430,7 @@ def hourly_report():
         return
     best_s, best_p = optimizer.get_best_focus()
     active = list(active_trades.keys()) or ["None"]
-    notify("Bot Active — Alhamdulillah",
+    notify("Bot Active - Alhamdulillah",
         f"Scans: {scan_count}\n"
         f"Active: {', '.join(active)}\n"
         f"Session: {'ON' if is_good_session() else 'OFF'}\n"
@@ -495,9 +442,7 @@ def hourly_report():
     last_report = time.time()
     scan_count  = 0
 
-# ═══════════════════════════════════════
 # MAIN LOOP
-# ═══════════════════════════════════════
 def run():
     global scan_count
     start_time = time.time()
@@ -508,7 +453,7 @@ def run():
     while True:
         # 5.5 hour restart for GitHub Actions
         if time.time() - start_time > 19800:
-            notify("Auto Restart", "5.5hr done — restarting", tags="arrows_counterclockwise")
+            notify("Auto Restart", "5.5hr done - restarting", tags="arrows_counterclockwise")
             print("[EXIT] Restarting...")
             break
 
@@ -521,7 +466,7 @@ def run():
             print(f"\n[TIME] {now.strftime('%d-%b %H:%M')} UTC")
 
             if is_news_time():
-                print("[SKIP] News time — 10min wait")
+                print("[SKIP] News time - 10min wait")
                 time.sleep(600)
                 continue
 
@@ -550,7 +495,7 @@ def run():
 
                     # Uptrend filter
                     if not is_uptrend(symbol):
-                        print(f"[{symbol}] Below EMA200 — skip")
+                        print(f"[{symbol}] Below EMA200 - skip")
                         continue
 
                     # Volume check
@@ -566,4 +511,25 @@ def run():
                         time.sleep(1)
                         if symbol not in active_trades:
                             strat_breakout(df15, symbol)
-                            time.sl
+                            time.sleep(1)
+                            if symbol not in active_trades:
+                                strat_day_breakout(df15, symbol)
+                                time.sleep(1)
+                                if symbol not in active_trades:
+                                    strat_opportunity(df15, symbol)
+
+                    time.sleep(2)
+
+                except Exception as e:
+                    print(f"[SYMBOL ERR] {symbol}: {e}")
+                    time.sleep(2)
+
+            scan_count += 1
+            time.sleep(30)
+
+        except Exception as e:
+            print(f"[MAIN ERR] {e}")
+            time.sleep(30)
+
+if __name__ == "__main__":
+    run()
