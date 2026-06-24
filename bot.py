@@ -164,18 +164,16 @@ class Optimizer:
             w = v.get('wins', 0)
             l = v.get('losses', 0)
             wt = v.get('weight', 1.0)
-            strat_lines += "  " + s + ": " + str(w) + "W/" + str(l) + "L (weight:" + str(round(wt, 1)) + ")\n"
-"
+            strat_lines = strat_lines + "  " + s + ": " + str(w) + "W/" + str(l) + "L (weight:" + str(round(wt, 1)) + ")\n"
 
-                msg = (
+        msg = (
             "Date: " + yest + "\n"
             "Total Trades: " + str(total) + "\n"
             "Wins: " + str(wins) + " | Losses: " + str(losses) + "\n"
             "Win Rate: " + str(wr) + "%\n\n"
-            "Strategy Performance:\n"
-            + strat_lines + "\n\n"
-            "Best Strategy: " + str(best_s or 'N/A') + "\n\n"
-            "Best Pair: " + str(best_p or 'N/A') + "\n\n"
+            "Strategy Performance:\n" + strat_lines + "\n"
+            "Best Strategy: " + str(best_s or 'N/A') + "\n"
+            "Best Pair: " + str(best_p or 'N/A') + "\n"
             "Exchange: " + exchange_name
         )
         notify("Daily Report", msg, tags="bar_chart,calendar")
@@ -266,7 +264,6 @@ def is_uptrend(symbol):
     print("[TREND] " + symbol + ": " + trend_str, flush=True)
     return result
 
-# Volume spike = market momentum
 def is_volume_spike(df):
     vol_ma = df['volume'].rolling(20).mean().iloc[-1]
     cur_vol = df['volume'].iloc[-1]
@@ -274,7 +271,6 @@ def is_volume_spike(df):
     print("[VOL] cur:" + str(int(cur_vol)) + " ma:" + str(int(vol_ma)) + " spike:" + str(spike), flush=True)
     return spike, vol_ma
 
-# Market type via volume momentum
 def market_type(df):
     vol_ma = df['volume'].rolling(20).mean().iloc[-1]
     recent = df['volume'].iloc[-5:].mean()
@@ -300,24 +296,15 @@ def send_signal(symbol, strategy, market, entry, sl, tp1, tp2):
     tp2_pct = round((tp2 - entry) / entry * 100, 1)
     sl_pct = round((entry - sl) / entry * 100, 1)
     msg = (
-        "Coin: " + symbol + "
-"
-        "Strategy: " + strategy + "
-"
-        "Market: " + market + "
-"
-        "Session: " + session + "
-"
-        "Entry:  " + str(round(entry, 4)) + "
-"
-        "TP1:    " + str(round(tp1, 4)) + "  (+" + str(tp1_pct) + "%)
-"
-        "TP2:    " + str(round(tp2, 4)) + "  (+" + str(tp2_pct) + "%)
-"
-        "SL:     " + str(round(sl, 4)) + "   (-" + str(sl_pct) + "%)
-"
-        "RR:     1:" + str(rr) + "
-"
+        "Coin: " + symbol + "\n"
+        "Strategy: " + strategy + "\n"
+        "Market: " + market + "\n"
+        "Session: " + session + "\n"
+        "Entry:  " + str(round(entry, 4)) + "\n"
+        "TP1:    " + str(round(tp1, 4)) + "  (+" + str(tp1_pct) + "%)\n"
+        "TP2:    " + str(round(tp2, 4)) + "  (+" + str(tp2_pct) + "%)\n"
+        "SL:     " + str(round(sl, 4)) + "   (-" + str(sl_pct) + "%)\n"
+        "RR:     1:" + str(rr) + "\n"
         "Weight: " + str(round(weight, 1)) + "/2.0"
     )
     notify("BUY | " + strategy, msg)
@@ -458,20 +445,13 @@ def monitor(df, symbol):
     t = active_trades[symbol]
     c = df.iloc[-1]
     if c['high'] >= t['tp2']:
-        notify("TP2 HIT!", symbol + "
-Full target!
-TP2: " + str(round(t['tp2'], 4)) + "
-Strategy: " + t['strategy'], tags="trophy,fire")
+        notify("TP2 HIT!", symbol + "\nFull target!\nTP2: " + str(round(t['tp2'], 4)) + "\nStrategy: " + t['strategy'], tags="trophy,fire")
         optimizer.close_trade(symbol, 'win')
         active_trades.pop(symbol, None)
     elif c['high'] >= t['tp1']:
-        notify("TP1 HIT!", symbol + "
-TP1: " + str(round(t['tp1'], 4)) + "
-Move SL to entry!", tags="money_bag")
+        notify("TP1 HIT!", symbol + "\nTP1: " + str(round(t['tp1'], 4)) + "\nMove SL to entry!", tags="money_bag")
     elif c['low'] <= t['sl']:
-        notify("SL HIT", symbol + "
-SL: " + str(round(t['sl'], 4)) + "
-Strategy: " + t['strategy'], tags="red_circle")
+        notify("SL HIT", symbol + "\nSL: " + str(round(t['sl'], 4)) + "\nStrategy: " + t['strategy'], tags="red_circle")
         optimizer.close_trade(symbol, 'loss')
         active_trades.pop(symbol, None)
 
@@ -490,22 +470,41 @@ def hourly_report():
     session_status = "ON" if is_good_session() else "OFF"
     news_status = "BLOCKED" if is_news_time() else "CLEAR"
     notify("Bot Active - Alhamdulillah",
-        "Scans: " + str(scan_count) + "
-"
-        "Active: " + ", ".join(active) + "
-"
-        "Session: " + session_status + "
-"
-        "News: " + news_status + "
-"
-        "Exchange: " + exchange_name + "
-"
-        "Best Strategy: " + str(best_s or 'N/A') + "
-"
+        "Scans: " + str(scan_count) + "\n"
+        "Active: " + ", ".join(active) + "\n"
+        "Session: " + session_status + "\n"
+        "News: " + news_status + "\n"
+        "Exchange: " + exchange_name + "\n"
+        "Best Strategy: " + str(best_s or 'N/A') + "\n"
         "Best Pair: " + str(best_p or 'N/A'),
         tags="robot,white_check_mark")
     last_report = time.time()
     scan_count = 0
+
+# =====================================================
+# MAIN LOOP
+# =====================================================
+def run():
+    global scan_count
+    start_time = time.time()
+    print("[START] Genius Trading Bot starting...", flush=True)
+    notify("Bot Started", "Genius Trading Bot Live!\nBTC ETH SOL AVAX\nExchange: " + exchange_name + "\n100% Halal Spot", tags="rocket")
+    print("[START] Notification sent!", flush=True)
+
+    while True:
+        # 5.5 hour restart for GitHub Actions
+        if time.time() - start_time > 19800:
+            notify("Auto Restart", "5.5hr done - restarting", tags="arrows_counterclockwise")
+            print("[EXIT] Restarting...", flush=True)
+            break
+
+        try:
+            # Daily report at 6am UTC
+            optimizer.daily_report()
+            hourly_report()
+
+            now = datetime.now(timezone.utc)
+            print("\n[TIME] " + now.strftime('%d-%b %H:%M') + " UTC", flush=True)
 
 # =====================================================
 # MAIN LOOP
@@ -533,7 +532,8 @@ Exchange: " + exchange_name + "
             hourly_report()
 
             now = datetime.now(timezone.utc)
-                        print("[TIME] " + now.strftime('%d-%b %H:%M') + " UTC", flush=True)
+            print("
+[TIME] " + now.strftime('%d-%b %H:%M') + " UTC", flush=True)
 
             if is_news_time():
                 print("[SKIP] News time - 10min wait", flush=True)
@@ -545,13 +545,15 @@ Exchange: " + exchange_name + "
                 time.sleep(60)
                 continue
 
-            print("\n" + "="*45, flush=True)
+            print("
+" + "="*45, flush=True)
             print("[SCAN #" + str(scan_count+1) + "] " + now.strftime('%d-%b %H:%M') + " UTC | " + exchange_name, flush=True)
             print("="*45, flush=True)
 
             for symbol in SYMBOLS:
                 try:
-                    print("\n--- " + symbol + " ---", flush=True)
+                    print("
+--- " + symbol + " ---", flush=True)
                     df15 = get_df(symbol, TF_ENTRY)
                     if df15 is None or df15.empty:
                         print("[" + symbol + "] No data", flush=True)
@@ -595,7 +597,8 @@ Exchange: " + exchange_name + "
                     time.sleep(2)
 
             scan_count += 1
-            print("\n[OK] Scan complete. Waiting 10 minutes for next cycle...", flush=True)
+            print("
+[OK] Scan complete. Waiting 10 minutes for next cycle...", flush=True)
             time.sleep(30)
 
         except Exception as e:
