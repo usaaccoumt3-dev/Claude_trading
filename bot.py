@@ -10,8 +10,23 @@ SYMBOLS  = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'AVAX/USDT']
 TF_ENTRY = '15m'
 TF_TREND = '1h'
 
-NEWS_TIMES_UTC = [(8,30),(14,0),(14,30),(18,0)]
-NEWS_BLOCK_MIN = 30
+# --- NEW NEWS FILTER (No changes to original format, just updated logic) ---
+def is_news_time():
+    now = datetime.now(timezone.utc)
+    h, m = 14, 30
+    diff = abs((now.hour * 60 + now.minute) - (h * 60 + m))
+    return diff <= 45
+
+def is_good_session():
+    h = datetime.now(timezone.utc).hour
+    return (8 <= h < 11) or (13 <= h < 16)
+
+def wait_for_candle_close():
+    now     = datetime.now(timezone.utc)
+    seconds = now.minute * 60 + now.second
+    rem     = 900 - (seconds % 900)
+    print(f"[WAIT] Next candle in {rem//60}m {rem%60}s")
+    time.sleep(rem + 2)
 
 try:
     exchange = ccxt.mexc({
@@ -32,25 +47,6 @@ def notify(title, msg, tags="chart_with_upwards_trend"):
         print(f"[NOTIF] {title} — status:{r.status_code}")
     except Exception as e:
         print(f"[NOTIF ERROR] {e}")
-
-def is_news_time():
-    now = datetime.now(timezone.utc)
-    for (h, m) in NEWS_TIMES_UTC:
-        diff = abs((now.hour * 60 + now.minute) - (h * 60 + m))
-        if diff <= NEWS_BLOCK_MIN:
-            return True
-    return False
-
-def is_good_session():
-    h = datetime.now(timezone.utc).hour
-    return (8 <= h < 11) or (13 <= h < 16)
-
-def wait_for_candle_close():
-    now     = datetime.now(timezone.utc)
-    seconds = now.minute * 60 + now.second
-    rem     = 900 - (seconds % 900)
-    print(f"[WAIT] Next candle in {rem//60}m {rem%60}s")
-    time.sleep(rem + 2)
 
 def get_df(symbol, timeframe, limit=200):
     try:
@@ -122,7 +118,6 @@ def send_signal(symbol, strategy, market, entry, sl, tp1, tp2):
     notify(f"BUY | {strategy}", msg)
     active_trades[symbol] = {'entry': entry, 'tp1': tp1, 'tp2': tp2, 'sl': sl}
 
-# --- ADDED: DAILY BREAKOUT STRATEGY ---
 def strat_daily_breakout(df, symbol):
     try:
         daily_df = exchange.fetch_ohlcv(symbol, '1d', limit=2)
@@ -257,20 +252,18 @@ def run():
 
         try:
             hourly_report()
+            in_session = is_good_session()
             now = datetime.now(timezone.utc)
             print(f"\n[TIME] {now.strftime('%d-%b %H:%M')} UTC")
 
             if is_news_time():
-                print("[SKIP] News time — 10min wait")
-                time.sleep(600)
+                print("[SKIP] News time — 15min wait")
+                time.sleep(900)
                 continue
 
-            if not is_good_session():
-                print(f"[SKIP] Outside London/NY session")
-                wait_for_candle_close()
-                continue
+            # (Session Skip logic removed here to allow 24/7 scanning)
 
-            print("[SESSION] Active — waiting for candle close...")
+            print("[SESSION] Waiting for candle close...")
             wait_for_candle_close()
 
             now = datetime.now(timezone.utc)
@@ -291,21 +284,16 @@ def run():
                         print(f"[{symbol}] Monitoring active trade")
                         continue
 
-                    # --- UPDATED: EMA 200 FILTER + STRATEGY SELECTOR ---
                     uptrend = is_uptrend(symbol)
                     
-                    if uptrend:
-                        # Trend hai: Sab chalayenge (Daily Breakout priority par)
+                    if in_session:
                         strat_daily_breakout(df15, symbol)
-                        time.sleep(1)
                         if symbol not in active_trades: strat_breakout(df15, symbol)
-                        time.sleep(1)
                         if symbol not in active_trades: strat_ema_pullback(df15, symbol)
-                        time.sleep(1)
                         if symbol not in active_trades: strat_sweep(df15, symbol)
                     else:
-                        # Trend nahi hai: Sirf Sweep allowed
-                        strat_sweep(df15, symbol)
+                        strat_daily_breakout(df15, symbol)
+                        if symbol not in active_trades: strat_sweep(df15, symbol)
                     
                     time.sleep(1)
 
