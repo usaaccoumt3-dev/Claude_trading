@@ -10,7 +10,7 @@ from datetime import datetime, timezone, timedelta
 # ═══════════════════════════════════
 # CONFIG
 # ═══════════════════════════════════
-NTFY_URL          = "https://ntfy.sh/raokaif_secret_trading_786"
+NTFY_URL          = "https://ntfy.sh/Mrunknown_786"
 SYMBOLS           = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'AVAX/USDT', 'BNB/USDT']
 TF_ENTRY          = '15m'
 TF_BIAS           = '1h'
