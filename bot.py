@@ -73,9 +73,17 @@ def safe_fetch(exchange, symbol, timeframe, limit=200):
             data = exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
             return pd.DataFrame(data, columns=['ts','open','high','low','close','volume'])
         except Exception as e:
+            if '451' in str(e) or '403' in str(e):
+                log(f"Binance block! Switching to Bybit for {symbol}")
+                try:
+                    fallback = ccxt.bybit()
+                    data = fallback.fetch_ohlcv(symbol, timeframe, limit=limit)
+                    return pd.DataFrame(data, columns=['ts','open','high','low','close','volume'])
+                except: pass
             log(f"Fetch retry {attempt+1} {symbol}: {e}")
             time.sleep(2)
     return None
+
 
 # Binance order book — always used just for whale data (public, no key needed)
 _binance_public = None
