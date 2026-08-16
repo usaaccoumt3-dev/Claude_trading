@@ -28,13 +28,20 @@ active_trades = {}
 # ═══════════════════════════════════
 def notify(title, msg, tags="chart_with_upwards_trend"):
     try:
-        requests.post(NTFY_URL, data=msg.encode('utf-8'),
-            headers={"Title": title, "Priority": "high", "Tags": tags},
+        requests.post(
+            NTFY_URL,
+            data=msg.encode('utf-8'),
+            headers={
+                "Title": title,
+                "Priority": "high",
+                "Tags": tags,
+                "Content-Type": "text/plain; charset=utf-8"
+            },
             timeout=10)
         print(f"[NOTIF] {title}")
     except Exception as e:
         print(f"[NOTIF ERR] {e}")
-
+        
 # ═══════════════════════════════════
 # NEWS FILTER — high impact only
 # ═══════════════════════════════════
